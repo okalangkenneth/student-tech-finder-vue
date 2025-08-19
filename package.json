@@ -1,0 +1,29 @@
+{
+  "name": "student-tech-finder-vue",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+  "dev": "vite",
+  "server": "node server/index.js",
+  "build": "vite build",
+  "preview": "vite preview"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.55.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.1",
+    "express": "^5.1.0",
+    "vue": "^3.5.18",
+    "zod": "^4.0.17"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.1",
+    "@vue/tsconfig": "^0.7.0",
+    "typescript": "~5.8.3",
+    "vite": "^7.1.2",
+    "vue-tsc": "^3.0.5"
+  
+  }
+  
+}
