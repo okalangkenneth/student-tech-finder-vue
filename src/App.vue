@@ -46,10 +46,11 @@ async function doSearch(reset=false){
         topic: topic.value,
         budget: budget.value, screen: screen.value, os: os.value,
         brands: selectedBrands.value,
-        page: page.value, pageSize: pageSize.value
-        minPrice: minPrice.value,     
-        maxPrice: maxPrice.value,
-        broaden: broaden.value
+        page: page.value, 
+        pageSize: pageSize.value,
+        minPrice: minPrice.value ?? null,
+        maxPrice: maxPrice.value ?? null,
+        broaden: broaden.value,
       })
     })
     const data = await r.json()
