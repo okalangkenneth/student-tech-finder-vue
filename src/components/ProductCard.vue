@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 
 type Product = {
   id: string; title: string; brand: string;
@@ -9,15 +9,33 @@ type Product = {
   why?: string[];
 }
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   product: Product
   index: number
   queryUsed: string
   apiBase: string
+  /** optional compare chip in the corner */
+  showCompareToggle?: boolean
+  selectedForCompare?: boolean
+}>(), {
+  apiBase: '',
+  showCompareToggle: false,
+  selectedForCompare: false
+})
+
+const emit = defineEmits<{
+  (e: 'watch', product: Product): void
+  (e: 'toggle-compare', id: string): void
 }>()
 
-const imgSrc = computed(() =>
-  props.product.image || 'https://via.placeholder.com/640x360?text=No+Image')
+const imgSrc = ref(
+  props.product.image || 'https://via.placeholder.com/640x360?text=No+Image'
+)
+
+function onImgError(e: Event) {
+  const el = e.target as HTMLImageElement
+  el.src = 'https://via.placeholder.com/640x360?text=No+Image'
+}
 
 const priceText = computed(() => {
   const c = props.product.price?.currency || 'USD'
@@ -28,13 +46,40 @@ const priceText = computed(() => {
 })
 
 const buyHref = computed(() =>
-  `${props.apiBase}/api/go/${props.product.id}?url=${encodeURIComponent(props.product.url)}&rank=${props.index+1}&query=${encodeURIComponent(props.queryUsed)}`)
+  `${props.apiBase}/api/go/${props.product.id}` +
+  `?url=${encodeURIComponent(props.product.url)}` +
+  `&rank=${props.index + 1}` +
+  `&query=${encodeURIComponent(props.queryUsed)}`
+)
+
+const showAllWhy = ref(false)
+const whyTop = computed(() => (props.product.why ?? []).slice(0, 3))
+const whyRest = computed(() => (props.product.why ?? []).slice(3))
+
+function watchClick() {
+  emit('watch', props.product)
+}
+function toggleCompare() {
+  emit('toggle-compare', props.product.id)
+}
 </script>
 
 <template>
   <article class="card">
+    <button
+      v-if="showCompareToggle"
+      class="pick"
+      :aria-pressed="selectedForCompare"
+      @click.stop="toggleCompare"
+      title="Select for compare"
+    >
+      <span v-if="selectedForCompare">✓</span>
+      <span v-else>＋</span>
+      <small>Compare</small>
+    </button>
+
     <div class="thumb">
-      <img :src="imgSrc" alt="" loading="lazy" />
+      <img :src="imgSrc" alt="" loading="lazy" @error="onImgError" />
     </div>
 
     <div class="body">
@@ -54,11 +99,35 @@ const buyHref = computed(() =>
         <li v-if="product.specs?.weightKg">{{ product.specs?.weightKg }} kg</li>
       </ul>
 
-      <ul v-if="product.why?.length" class="why">
-        <li v-for="(w, i) in product.why" :key="i">• {{ w }}</li>
-      </ul>
+      <!-- Why we like this -->
+      <div v-if="product.why?.length" class="why-wrap">
+        <p class="why-title">Why we like this</p>
+        <ul class="why">
+          <li v-for="(w, i) in whyTop" :key="`t-${i}`">• {{ w }}</li>
+          <li v-if="showAllWhy" v-for="(w, i) in whyRest" :key="`r-${i}`">• {{ w }}</li>
+        </ul>
+        <button
+          v-if="whyRest.length"
+          class="why-toggle"
+          @click="showAllWhy = !showAllWhy"
+        >
+          {{ showAllWhy ? 'Show less' : `+${whyRest.length} more` }}
+        </button>
+      </div>
 
-      <a :href="buyHref" target="_blank" rel="nofollow sponsored" class="btn-buy">Buy</a>
+      <div class="cta-row">
+        <a
+          :href="buyHref"
+          target="_blank"
+          rel="nofollow sponsored"
+          class="btn-buy"
+        >Buy</a>
+
+        <button class="btn-watch" @click.prevent="watchClick">
+          Watch price
+        </button>
+      </div>
+
       <p class="tiny">We may earn a commission on qualifying purchases.</p>
     </div>
   </article>
@@ -66,26 +135,61 @@ const buyHref = computed(() =>
 
 <style scoped>
 .card {
-  display: grid; grid-template-rows: auto 1fr; gap: 12px;
-  background: #121212; border: 1px solid #2a2a2a; border-radius: 16px;
-  overflow: hidden; transition: transform .15s ease, box-shadow .15s ease;
+  position: relative;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 12px;
+  background: #121212;
+  border: 1px solid #2a2a2a;
+  border-radius: 16px;
+  overflow: hidden;
+  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
 }
-.card:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(0,0,0,.35); }
+.card:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(0,0,0,.35); border-color:#3a3a3a; }
+
+.pick {
+  position: absolute;
+  top: 10px; left: 10px;
+  display:flex; align-items:center; gap:6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid #2a2a2a;
+  background: #0b0b0b;
+  color:#d1d5db;
+  font-size: .8rem;
+  z-index: 2;
+}
+.pick[aria-pressed="true"]{ background:#1f2937; color:#fff; border-color:#3b4252; }
+
 .thumb { aspect-ratio: 16/9; background: #0d0d0d; display: flex; align-items: center; justify-content: center; }
 .thumb img { width: 100%; height: 100%; object-fit: cover; }
+
 .body { padding: 14px; display: grid; gap: 10px; }
 .brand-line .brand { font-size: .85rem; color: #9aa3af; letter-spacing: .02em; }
 .title { font-size: 1.05rem; line-height: 1.25; margin: 0; color: #eee; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .price-row { display: flex; align-items: baseline; gap: 8px; }
 .price { font-weight: 700; color: #f3f4f6; }
+
 .chips { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; padding: 0; margin: 0; }
 .chips li { font-size: .75rem; background: #1b1b1b; border: 1px solid #2c2c2c; padding: 4px 8px; border-radius: 999px; color: #cbd5e1; }
+
+.why-wrap { display:grid; gap:6px; }
+.why-title { margin:0; font-size:.85rem; color:#9aa3af; }
 .why { padding-left: 16px; margin: 0; color: #c9d1d9; font-size: .85rem; }
+.why-toggle { justify-self:start; background:#0b0b0b; border:1px solid #2a2a2a; color:#cbd5e1; padding:4px 8px; border-radius:8px; font-size:.8rem; }
+
+.cta-row { display:flex; gap:8px; align-items:center; }
 .btn-buy {
   display: inline-flex; align-items: center; justify-content: center;
   padding: 10px 14px; border-radius: 10px; background: #22c55e;
-  color: #0c0c0c; font-weight: 700; text-decoration: none; margin-top: 4px;
+  color: #0c0c0c; font-weight: 700; text-decoration: none;
 }
 .btn-buy:hover { filter: brightness(1.05); }
+.btn-watch {
+  padding: 10px 12px; border-radius:10px; border:1px solid #2a2a2a;
+  background:#0ea5e9; color:#0b0b0b; font-weight:700;
+}
+.btn-watch:hover { filter: brightness(1.05); }
+
 .tiny { margin: 0; color: #8b949e; font-size: .72rem; }
 </style>

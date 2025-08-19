@@ -1,89 +1,114 @@
 <script setup lang="ts">
+import UpsellStrip from './components/UpsellStrip.vue'
 import { ref, computed } from 'vue'
 import ProductCard from './components/ProductCard.vue'
 import EmailCapture from './components/EmailCapture.vue'
+import CompareModal from './components/CompareModal.vue'
 
 type Product = {
-  id: string; title: string; brand: string;
-  price: { currency: string; amount: number };
-  image: string; url: string;
-  specs?: { screen?: string; os?: string; weightKg?: number };
-  why?: string[];
+  id:string; title:string; brand:string;
+  price:{ currency:string; amount:number };
+  image:string; url:string;
+  specs?:{ screen?:string; os?:string; weightKg?:number };
+  why?:string[];
 }
 
+const topic = ref<'laptop'|'headphones'|'hubs'|'backpacks'|'monitors'>('laptop')
 const budget = ref('€500–€900')
 const screen = ref('14')
 const os = ref('Windows')
 const loading = ref(false)
 const queryUsed = ref('')
 const items = ref<Product[]>([])
+const page = ref(0)
+const pageSize = ref(12)
+const total = ref(0)
+const brandsAvailable = ref<string[]>([])
+const selectedBrands = ref<string[]>([])
 const sortBy = ref<'price-asc'|'price-desc'>('price-asc')
+const compareIds = ref<Set<string>>(new Set())
+const compareOpen = ref(false)
 
-// Same-origin in prod (Vercel), local API in dev
 const API_BASE = import.meta.env.PROD ? '' : (import.meta.env.VITE_API_BASE || 'http://localhost:4000')
 
-async function search() {
-  loading.value = true; items.value = []
+function resetAndSearch(){ items.value=[]; page.value=0; doSearch(true) }
+
+async function doSearch(reset=false){
+  loading.value = true
   try {
     const r = await fetch(`${API_BASE}/api/search`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ budget: budget.value, screen: screen.value, os: os.value }),
+      method:'POST', headers:{'content-type':'application/json'},
+      body: JSON.stringify({
+        topic: topic.value,
+        budget: budget.value, screen: screen.value, os: os.value,
+        brands: selectedBrands.value,
+        page: page.value, pageSize: pageSize.value
+      })
     })
     const data = await r.json()
-    if (data.ok) { items.value = data.results || []; queryUsed.value = data.query || '' }
-    else alert(data.error || 'Search failed')
-  } finally { loading.value = false }
+    if (data.ok){
+      queryUsed.value = data.query || ''
+      total.value = data.total || 0
+      brandsAvailable.value = data.brands || []
+      const newOnes = (data.results || []) as Product[]
+      // de-dup by id when appending
+      const existing = new Set(items.value.map(p=>p.id))
+      const merged = reset ? newOnes : [...items.value, ...newOnes.filter(p=>!existing.has(p.id))]
+      items.value = merged
+    } else alert(data.error || 'Search failed')
+  } finally { loading.value=false }
 }
 
-const sortedItems = computed(() => {
-  const list = [...items.value]
-  if (sortBy.value === 'price-asc') list.sort((a,b)=>(a.price?.amount??0)-(b.price?.amount??0))
-  if (sortBy.value === 'price-desc') list.sort((a,b)=>(b.price?.amount??0)-(a.price?.amount??0))
+function loadMore(){
+  if ((page.value+1)*pageSize.value >= total.value) return
+  page.value += 1
+  doSearch(false)
+}
+
+const sortedFiltered = computed(()=>{
+  let list = [...items.value]
+  if (selectedBrands.value.length) list = list.filter(p=>selectedBrands.value.includes(p.brand))
+  if (sortBy.value==='price-asc')  list.sort((a,b)=>(a.price?.amount??0)-(b.price?.amount??0))
+  if (sortBy.value==='price-desc') list.sort((a,b)=>(b.price?.amount??0)-(a.price?.amount??0))
   return list
 })
+
+function toggleCompare(id:string){
+  const s = new Set(compareIds.value)
+  s.has(id) ? s.delete(id) : s.add(id)
+  compareIds.value = s
+}
+const compareItems = computed(()=> sortedFiltered.value.filter(p=>compareIds.value.has(p.id)))
 </script>
+
 
 <template>
   <main class="wrap">
-    <h1>Student Tech Finder</h1>
-    <p class="tag">Answer 3 quick questions. <em>We may earn from qualifying purchases.</em></p>
+    <nav class="tabs">
+      <button :class="{active:topic==='laptop'}" @click="topic='laptop'; resetAndSearch()">Laptops</button>
+      <button :class="{active:topic==='headphones'}" @click="topic='headphones'; resetAndSearch()">Headphones</button>
+      <button :class="{active:topic==='hubs'}" @click="topic='hubs'; resetAndSearch()">USB-C Hubs</button>
+      <button :class="{active:topic==='backpacks'}" @click="topic='backpacks'; resetAndSearch()">Backpacks</button>
+      <button :class="{active:topic==='monitors'}" @click="topic='monitors'; resetAndSearch()">Budget Monitors</button>
+    </nav>
 
-    <div class="controls">
-      <label>
-        <span>Budget</span>
-        <select v-model="budget">
-          <option>Under €500</option>
-          <option>€500–€900</option>
-          <option>€900–€1400</option>
-          <option>Any</option>
-        </select>
+    <!-- existing title/controls ... -->
+    <!-- Add brand filter chips -->
+    <div v-if="brandsAvailable.length" class="brand-filter">
+      <span>Brands:</span>
+      <label v-for="b in brandsAvailable" :key="b" class="chip">
+        <input type="checkbox" :value="b" v-model="selectedBrands" @change="resetAndSearch" />
+        <span>{{ b }}</span>
       </label>
-
-      <label>
-        <span>Screen size</span>
-        <select v-model="screen">
-          <option>13</option><option>14</option><option>15</option><option>16</option><option>17</option>
-          <option>Any</option>
-        </select>
-      </label>
-
-      <label>
-        <span>OS</span>
-        <select v-model="os">
-          <option>Windows</option><option>macOS</option><option>ChromeOS</option><option>Any OS</option>
-        </select>
-      </label>
-
-      <button class="btn" @click="search" :disabled="loading">{{ loading ? 'Searching…' : 'Find laptops' }}</button>
     </div>
 
     <EmailCapture />
 
-    <div class="query" v-if="queryUsed">Query used: <code>{{ queryUsed }}</code></div>
-
-    <div class="toolbar" v-if="items.length || loading">
-      <div/>
+    <div class="toolbar" v-if="sortedFiltered.length || loading">
+      <div class="compare-info">
+        <span>{{ compareIds.size }} selected</span>
+        <button v-if="compareIds.size>=2" @click="compareOpen=true">Compare</button>
+      </div>
       <label class="sorter">
         <span>Sort</span>
         <select v-model="sortBy">
@@ -93,19 +118,28 @@ const sortedItems = computed(() => {
       </label>
     </div>
 
-    <!-- Skeletons -->
-    <div v-if="loading" class="grid">
-      <div v-for="n in 6" :key="n" class="skeleton"></div>
+    <!-- Grid -->
+    <div v-if="loading" class="grid"><div v-for="n in 12" :key="n" class="skeleton"/></div>
+    <div v-else class="grid">
+      <div v-for="(p,i) in sortedFiltered" :key="p.id" class="with-select">
+        <label class="pick">
+          <input type="checkbox" :checked="compareIds.has(p.id)" @change="toggleCompare(p.id)" />
+          <span>Select</span>
+        </label>
+        <ProductCard :product="p" :index="i" :queryUsed="queryUsed" :apiBase="API_BASE" @watch="(prod) => watchPrice(prod)"/>
+      </div>
     </div>
 
-    <!-- Results -->
-    <div v-else class="grid">
-      <ProductCard
-        v-for="(p, i) in sortedItems" :key="p.id"
-        :product="p" :index="i" :queryUsed="queryUsed" :apiBase="API_BASE" />
+    <div class="load-more" v-if="(page+1)*pageSize < total">
+      <button class="btn" @click="loadMore" :disabled="loading">Load more</button>
+      <p class="tiny">{{ Math.min((page+1)*pageSize, total) }} / {{ total }}</p>
     </div>
+
+    <CompareModal :open="compareOpen" :items="compareItems" @close="compareOpen=false"/>
   </main>
+  <UpsellStrip @pick="(t)=>{ topic = t as any; resetAndSearch(); }" />
 </template>
+
 
 <style scoped>
 .wrap { max-width: 1100px; margin: 24px auto 80px; padding: 0 16px; color: #e5e7eb; }
@@ -130,5 +164,17 @@ select { background:#0b0b0b; color:#e5e7eb; border:1px solid #2a2a2a; border-rad
 @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 .query { color:#9aa3af; margin: 6px 0 0; font-size:.9rem; }
 code { background:#0b0b0b; border:1px solid #2a2a2a; padding: 2px 6px; border-radius: 6px; }
+
+.tabs{display:flex;gap:8px;justify-content:center;margin:8px 0 18px}
+.tabs button{padding:8px 12px;border-radius:10px;border:1px solid #2a2a2a;background:#0b0b0b;color:#cbd5e1}
+.tabs .active{background:#1f2937;color:#fff}
+
+.brand-filter{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:10px 0}
+.chip{display:inline-flex;gap:6px;align-items:center;background:#0b0b0b;border:1px solid #2a2a2a;padding:6px 10px;border-radius:999px}
+.pick{position:absolute;top:10px;left:10px;display:flex;gap:6px;align-items:center;background:#0b0b0b;border:1px solid #2a2a2a;border-radius:999px;padding:4px 8px;font-size:.8rem}
+.with-select{position:relative}
+
+.load-more{display:grid;place-items:center;margin:16px 0 40px}
+
 </style>
 
