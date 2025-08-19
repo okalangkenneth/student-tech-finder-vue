@@ -44,7 +44,9 @@ async function doSearch(reset=false){
       method:'POST', headers:{'content-type':'application/json'},
       body: JSON.stringify({
         topic: topic.value,
-        budget: budget.value, screen: screen.value, os: os.value,
+        budget: budget.value, 
+        screen: screen.value, 
+        os: os.value,
         brands: selectedBrands.value,
         page: page.value, 
         pageSize: pageSize.value,
