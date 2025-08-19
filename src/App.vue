@@ -28,6 +28,10 @@ const selectedBrands = ref<string[]>([])
 const sortBy = ref<'price-asc'|'price-desc'>('price-asc')
 const compareIds = ref<Set<string>>(new Set())
 const compareOpen = ref(false)
+const minPrice = ref<number | null>(null)
+const maxPrice = ref<number | null>(null)
+const broaden  = ref(false)
+
 
 const API_BASE = import.meta.env.PROD ? '' : (import.meta.env.VITE_API_BASE || 'http://localhost:4000')
 
@@ -43,6 +47,9 @@ async function doSearch(reset=false){
         budget: budget.value, screen: screen.value, os: os.value,
         brands: selectedBrands.value,
         page: page.value, pageSize: pageSize.value
+        minPrice: minPrice.value,     
+        maxPrice: maxPrice.value,
+        broaden: broaden.value
       })
     })
     const data = await r.json()
@@ -57,6 +64,23 @@ async function doSearch(reset=false){
       items.value = merged
     } else alert(data.error || 'Search failed')
   } finally { loading.value=false }
+}
+
+// inside <script setup>
+async function watchPrice(p:any){
+  const email = prompt('Your email for price alerts?')
+  if (!email) return
+  await fetch(`${API_BASE}/api/watch/add`, {
+    method:'POST',
+    headers:{'content-type':'application/json'},
+    body: JSON.stringify({
+      email,
+      product_id: p.id,
+      threshold: p?.price?.amount ?? null,
+      last_price: p?.price?.amount ?? null
+    })
+  })
+  alert('Watching! We’ll email you if the price drops.')
 }
 
 function loadMore(){
@@ -102,6 +126,46 @@ const compareItems = computed(()=> sortedFiltered.value.filter(p=>compareIds.val
       </label>
     </div>
 
+    <!-- Price range + broaden toggle -->
+    <div class="filters">
+      <label class="field">
+        <span>Min (€)</span>
+        <input
+          type="number"
+          min="0"
+          step="10"
+          v-model.number="minPrice"
+          placeholder="0"
+          inputmode="numeric"
+        />
+      </label>
+
+      <label class="field">
+        <span>Max (€)</span>
+        <input
+          type="number"
+          min="0"
+          step="10"
+          v-model.number="maxPrice"
+          placeholder="900"
+          inputmode="numeric"
+        />
+      </label>
+
+      <label class="switch" title="Loosen specs to see more results">
+        <input type="checkbox" v-model="broaden" />
+        <span>Broaden search</span>
+      </label>
+
+      <button class="btn primary" @click="resetAndSearch" :disabled="loading">
+        Find laptops
+      </button>
+    </div>
+
+
+
+
+
     <EmailCapture />
 
     <div class="toolbar" v-if="sortedFiltered.length || loading">
@@ -126,7 +190,8 @@ const compareItems = computed(()=> sortedFiltered.value.filter(p=>compareIds.val
           <input type="checkbox" :checked="compareIds.has(p.id)" @change="toggleCompare(p.id)" />
           <span>Select</span>
         </label>
-        <ProductCard :product="p" :index="i" :queryUsed="queryUsed" :apiBase="API_BASE" @watch="(prod) => watchPrice(prod)"/>
+        <ProductCard v-for="(p,i) in sortedFiltered" :key="p.id" :product="p" :index="i" :queryUsed="queryUsed" :apiBase="API_BASE" @watch="watchPrice" />
+
       </div>
     </div>
 
@@ -175,6 +240,34 @@ code { background:#0b0b0b; border:1px solid #2a2a2a; padding: 2px 6px; border-ra
 .with-select{position:relative}
 
 .load-more{display:grid;place-items:center;margin:16px 0 40px}
+
+/* controls row */
+.filters{
+  display:flex; flex-wrap:wrap; gap:10px;
+  align-items:flex-end; justify-content:center;
+  margin:10px 0 16px;
+}
+
+.field{ display:grid; gap:6px; }
+.field span{ font-size:.8rem; color:#9aa3af; }
+.field input{
+  width:140px;
+  background:#0b0b0b; color:#e5e7eb;
+  border:1px solid #2a2a2a; border-radius:10px;
+  padding:8px 10px; outline:none;
+}
+.field input:focus{ border-color:#3b82f6; }
+
+.switch{ display:flex; align-items:center; gap:8px; padding:8px 12px;
+  border:1px solid #2a2a2a; border-radius:999px; background:#0b0b0b; color:#e5e7eb; }
+.switch input{ accent-color:#3b82f6; }
+
+.btn.primary{
+  background:#22c55e; color:#0c0c0c; border:none;
+  padding:10px 14px; border-radius:10px; font-weight:700;
+}
+.btn.primary:disabled{ opacity:.6; cursor:not-allowed; }
+
 
 </style>
 
