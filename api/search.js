@@ -101,6 +101,23 @@ export default async function handler(req, res) {
   const raw = Array.isArray(json) ? json : (json.results ?? [])
   let normalized = raw.map(normalize).filter(isRelevant)
 
+  // after: let normalized = raw.map(normalize).filter(isRelevant)
+
+  const dedupeByTitleBrandPrice = (arr) => {
+    const seen = new Set()
+    return arr.filter(p => {
+      const key = `${(p.title||'').toLowerCase().trim()}|${(p.brand||'').toLowerCase().trim()}|${Math.round(p?.price?.amount ?? 0)}`
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+  }
+
+normalized = dedupeByTitleBrandPrice(normalized)
+
+if (brands?.length) normalized = normalized.filter(p => p.brand && brands.includes(p.brand))
+
+
   if (brands?.length) normalized = normalized.filter(p => p.brand && brands.includes(p.brand))
 
   const brandSet = new Set(normalized.map(p => p.brand).filter(Boolean))
