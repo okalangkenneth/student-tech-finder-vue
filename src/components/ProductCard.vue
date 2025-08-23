@@ -29,22 +29,30 @@ const emit = defineEmits<{
 
 const imgSrc = ref(props.product.image || 'https://via.placeholder.com/640x360?text=No+Image')
 function onImgError(e: Event) {
-  (e.target as HTMLImageElement).src = 'https://via.placeholder.com/640x360?text=No+Image'
+  const target = e.target as HTMLImageElement | null
+  if (target) target.src = 'https://via.placeholder.com/640x360?text=No+Image'
 }
 
 const priceText = computed(() => {
-  const c = props.product.price?.currency || 'USD'
-  const n = props.product.price?.amount ?? 0
-  try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: c }).format(n) }
-  catch { return `${c} ${n.toFixed(2)}` }
+  const currency = props.product.price?.currency ?? 'USD'
+  const amount = props.product.price?.amount ?? 0
+  try {
+    return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(amount)
+  } catch {
+    return `${currency} ${amount.toFixed(2)}`
+  }
 })
 
 const buyHref = computed(() =>
-  `${props.apiBase}/api/go/${props.product.id}?url=${encodeURIComponent(props.product.url)}&rank=${props.index+1}&query=${encodeURIComponent(props.queryUsed)}`
+  `${props.apiBase}/api/go/${props.product.id}?url=${encodeURIComponent(props.product.url)}&rank=${props.index + 1}&query=${encodeURIComponent(props.queryUsed)}`
 )
 
-function watchClick(){ emit('watch', props.product) }
-function toggleCompare(){ emit('toggle-compare', props.product.id) }
+function watchClick() {
+  emit('watch', props.product)
+}
+function toggleCompare() {
+  emit('toggle-compare', props.product.id)
+}
 </script>
 
 <template>
@@ -96,11 +104,20 @@ function toggleCompare(){ emit('toggle-compare', props.product.id) }
   aspect-ratio: 16/9; background:#0b0b0b;
   display:flex; align-items:center; justify-content:center; padding:8px; /* letterbox space */
 }
-.thumb img { width:100%; height:100%; object-fit: contain; } /* <-- no cropping */
+.thumb img { width: 100%; height: 100%; object-fit: contain; background:#0d0d0d; }
 
 .body { padding:14px; display:grid; gap:10px; }
 .brand-line .brand { font-size:.85rem; color:#9aa3af; letter-spacing:.02em; }
-.title { font-size:1.05rem; line-height:1.25; margin:0; color:#eee; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.title {
+  font-size:1.05rem; line-height:1.25; margin:0; color:#eee;
+  /* multi-line truncation */
+  display:-webkit-box;
+  -webkit-box-orient:vertical;
+  -webkit-line-clamp:2;
+  /* standard property for newer browsers */
+  line-clamp: 2;
+  overflow:hidden;
+}
 .price-row { display:flex; align-items:baseline; gap:8px; }
 .price { font-weight:700; color:#f3f4f6; }
 .chips { list-style:none; display:flex; flex-wrap:wrap; gap:8px; padding:0; margin:0; }

@@ -4,6 +4,8 @@ import ProductCard from './components/ProductCard.vue'
 import EmailCapture from './components/EmailCapture.vue'
 import CompareModal from './components/CompareModal.vue'
 import UpsellStrip from './components/UpsellStrip.vue'
+import CookieConsent from './components/CookieConsent.vue'
+import StarterPack from './components/StarterPack.vue'
 
 type Product = {
   id: string
@@ -185,6 +187,9 @@ const compareItems = computed(() => sortedFiltered.value.filter(p => compareIds.
 
     <EmailCapture />
 
+    <StarterPack :apiBase="API_BASE" />
+
+
     <!-- Toolbar -->
     <div class="toolbar" v-if="sortedFiltered.length || loading">
       <div class="compare-info">
@@ -230,6 +235,9 @@ const compareItems = computed(() => sortedFiltered.value.filter(p => compareIds.
     </div>
 
     <CompareModal :open="compareOpen" :items="compareItems" @close="compareOpen = false" />
+
+    <CookieConsent />
+
   </main>
 
   <UpsellStrip @pick="(t) => { topic = t as any; resetAndSearch(); }" />
